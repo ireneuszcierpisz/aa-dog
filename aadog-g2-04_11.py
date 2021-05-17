@@ -254,7 +254,7 @@ with dai.Device(pipeline) as device:
                 p_time = time.monotonic()
                 persons.append([person_id, p_time, (xc, yc, X, Y, Z)])
             # check the list of objects to see if there's an object that has come out of a frame for more than 2sec
-            l = [] # list of cars which has come out of a frame and should to be deleted from cars tracking list
+            l = [] # list of persons which has come out of a frame and should to be deleted from persons tracking list
             for c in range(len(persons)):
                 if current_time - persons[c][1] > 2:
                     l.append(c)
@@ -353,7 +353,7 @@ with dai.Device(pipeline) as device:
                     # compute points of an extrapolation line for a current frame
                     while (cp[0]>=-lim and cp[0]<=lim and cp[1]>=-lim and cp[1]<=lim and cp[2]<=lim*4 ):
                         cp = cp + (10 * v) 
-                    pcp.append((cp0,cp,v))   # appends first and last point on the line of hypothetical car movement
+                    pcp.append((cp0,cp,v))   # append direction vector and first and last point on the line of hypothetical car movement
             ppp = []  # list of presumed persons positions
             for person in persons:
                 if len(person) > 3:   # if there are in car at least two tuples with coords
@@ -369,29 +369,36 @@ with dai.Device(pipeline) as device:
                     # compute points of an extrapolation line for a current frame
                     while (pp[0]>=-lim and pp[0]<=lim and pp[1]>=-lim and pp[1]<=lim and pp[2]<=lim*4 ):
                         pp = pp + (10 * v) 
-                    ppp.append((pp0,pp,v))   # appends first and last point on the line of hypothetical car movement
+                    ppp.append((pp0,pp,v))   # appends first and last point on the line of hypothetical car movement, also direction vector
             
             # COMPUTE AN INTERSECTION POINT IN GIVEN FRAME. 
             # calculations for each pair of car and person
-            # from given two straight lines (lc fo car, lp for person)
-            # lc = pcp[0] + t1*pcp[2], lp = ppp[0] + t2*ppp[2]
+            # from given two straight lines (lc for car, lp for person)
+            # for lc: point [x,y,z] = cp0 + t1*v1,   # for lp: [x,y,z] = pp0 + t2*v2
             # if these two lines actually intersect at a point
             # from lc obtain:
-            #x = pcp[0][0] + t1*pcp[2][0]
-            #y = pcp[0][1] + t1*pcp[2][1]
-            #z = pcp[0][2] + t1*pcp[2][2] 
+            #x = cp0[0] + t1*v1[0]  #y = cp0[1] + t1*v1[1]  #z = cp0[2] + t1*v1[2] 
             ## from lp obtain:
-            #x = ppp[0][0] + t2*ppp[2][0]
-            #y = ppp[0][1] + t2*ppp[2][1]
-            #z = ppp[0][2] + t2*ppp[2][2] 
+            #x = pp0[0] + t2*v2[0]  #y = pp0[1] + t2*v2[1]  #z = pp0[2] + t2*v2[2] 
             ## equate
-            #pcp[0][0] + t1*pcp[2][0] = ppp[0][0] + t2*ppp[2][0]
-            #pcp[0][1] + t1*pcp[2][1] = ppp[0][1] + t2*ppp[2][1]
-            if pcp:
-                if ppp:
-                    a1, b1, a2, b2, c1, d1, c2, d2 = pcp[0][0], pcp[2][0], ppp[0][0], ppp[2][0], pcp[0][1], pcp[2][1], ppp[0][1], ppp[2][1]
-                    t2 = (c1 - c2 + (a2/b1) - (a1/b1)) / (d2 - (b2/b1))
-                    t1 = (a2 + (t2 * b2) - a1) / b1
+            #cp0[0] + t1*v1[0] = pp0[0] + t2*v2[0]
+            # so: t1*v1[0] - t2*v2[0] = pp0[0] - cp0[0]
+            #cp0[1] + t1*v1[1] = pp0[1] + t2*v2[1]
+            # so: t1*v1[1] - t2*v2[1] = pp0[1] - cp0[1]
+            #cp0[2] + t1*v1[2] = pp0[2] + t2*v2[2]
+            # so: t1*v1[2] - t2*v2[2] = pp0[2] - cp0[2]
+            if len(pcp) != 0 and len(ppp) != 0:   # if there is a car and a person detected
+                for c in pcp:
+                    for p in ppp:
+                        x1, a1, x2, a2, y1, b1, y2, b2, z1, c1, z2, c2 = c[0][0], c[2][0], p[0][0], p[2][0], c[0][1], c[2][1], p[0][1], p[2][1], c[0][2], c[2][2], p[0][2], p[2][2]
+                        t1 = (a2*(y2-y1) - b2*(x2-x1)) / (a2*b1-a1*b2)
+                        t2 = (a1*(y2-y1) - b1*(x2-x1)) / (a2*b1-a1*b2)
+                        if (t1 * c1) - (t2 * c2) == (z2 - z1):  # if these lines do intersect get intersection point as a np.array
+                            intersection_point = c[0] + t1 * c[2]
+                        # if these lines are skew :
+
+
+# if the set of coefficients of the direction vector in two lines L1 and L2 are proportional these lines are parallel to each other
             #print('pcp: ', pcp)
             #a1 = pcp[0][0]
 
