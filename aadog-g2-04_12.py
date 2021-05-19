@@ -15,7 +15,7 @@ logging.getLogger().setLevel(logging.INFO)
 
 # check if the deviations in the series of coordinates, needed to calculate the direction of movement, are below the assumed threshold
 # reject a random error that occurs in collecting of depth coords X,Y,Z. The object is a list of data: [obj_id, detect_time, (xc, yc, X, Y),(....),(....)]
-def check_deviation_of_depth_coords(obj, xc, yc, X, Y, Z):   # this function should be called if len(obj)>4
+def check_deviation_of_depth_coords(obj, xc, yc, X, Y, Z):   # this function should be called if len(obj)>6
     #compute an average deviation of object coords for three last position
     dx = (abs(obj[4][0] - obj[5][0]) + abs(obj[5][0] - obj[6][0]))//2 * 2
     if dx == 0: dx = 5
@@ -28,7 +28,7 @@ def check_deviation_of_depth_coords(obj, xc, yc, X, Y, Z):   # this function sho
     dZ = (abs(obj[4][4] - obj[5][4]) + abs(obj[5][4] - obj[6][4]))//2 * 2
     if dZ < 10: dZ = 50
 
-    # if xc, yc is within the mean deviation and X or Y is large ignore this
+    # if xc, yc is within the mean deviation and value of X or Y is large ignore it
     if abs(obj[-1][0] - xc) <= dx and abs(obj[-1][1] - yc) <= dy and abs(obj[-1][2] - X) > dX*3:
         X = obj[-1][2]
     if abs(obj[-1][0] - xc) <= dx and abs(obj[-1][1] - yc) <= dy and abs(obj[-1][3] - Y) > dY*3:
@@ -253,12 +253,13 @@ with dai.Device(pipeline) as device:
                         if X != 0 or Y != 0:
                             p_time = time.monotonic()
                             person_id += 1
-                            persons.append([person_id, p_time, (0,0,0), [0,0,0], (xc, yc, X, Y, Z)])   # append coordinates to the list as a new object position 
+                            persons.append([person_id, p_time, ([0,0,0],[0,0,0],[0,0,0]), [0,0,0], (xc, yc, X, Y, Z)])   # append coordinates to the list as a new object position 
                             not_found = False
             elif label == "person":     # append the first object
                 p_time = time.monotonic()
                 # append obj id, last possition detection time, extrapolation line parameters(p0,pn,v), intersection point coords and obj id-s, spatial position
-                persons.append([person_id, p_time, (0,0,0), [0,0,0], (xc, yc, X, Y, Z)])
+                persons.append([person_id, p_time, ([0,0,0],[0,0,0],[0,0,0]), [0,0,0], (xc, yc, X, Y, Z)])
+            
             # check the list of objects to see if there's an object that has come out of a frame for more than 2sec
             l = [] # list of persons which has come out of a frame and should to be deleted from persons tracking list
             for c in range(len(persons)):
@@ -298,8 +299,6 @@ with dai.Device(pipeline) as device:
                 p_time = time.monotonic()
                 cars.append([car_id, p_time, ([0,0,0],[0,0,0],[0,0,0]), [0,0,0], (xc, yc, X, Y, Z)])
 
-
-            # updates the tracker  
             # check the list of objects to see if there's an object that has come out of a frame for more than 2sec
             l = [] # list of cars which has come out of a frame and should to be deleted from cars tracking list
             for c in range(len(cars)):
@@ -331,18 +330,6 @@ with dai.Device(pipeline) as device:
             #file.close()
 
             
-            # show data in the frame
-            #cv2.putText(frame, str(label), (x1 + 10, y1 + 20), cv2.FONT_HERSHEY_TRIPLEX, 0.5, color)
-            #cv2.putText(frame, "{:.2f}".format(detection.confidence*100), (x1 + 10, y1 + 35), cv2.FONT_HERSHEY_TRIPLEX, 0.5, color)
-            ##cv2.putText(frame, f"(X,Y,Z): {int(detection.spatialCoordinates.x)}, {int(detection.spatialCoordinates.y)}, {int(detection.spatialCoordinates.z)}mm", (x1 + 10, y1 + 50), cv2.FONT_HERSHEY_TRIPLEX, 0.5, color)
-
-            #cv2.putText(frame, f"X: {int(detection.spatialCoordinates.x)} mm", (x1 + 10, y1 + 50), cv2.FONT_HERSHEY_TRIPLEX, 0.5, color)
-            #cv2.putText(frame, f"Y: {int(detection.spatialCoordinates.y)} mm", (x1 + 10, y1 + 65), cv2.FONT_HERSHEY_TRIPLEX, 0.5, color)
-            #cv2.putText(frame, f"Z: {int(detection.spatialCoordinates.z)} mm", (x1 + 10, y1 + 80), cv2.FONT_HERSHEY_TRIPLEX, 0.5, color)
-
-            #cv2.rectangle(frame, (x1, y1), (x2, y2), color, cv2.FONT_HERSHEY_SIMPLEX)
-            #cv2.circle(frame, (xc, yc), 5, (0,0,255), -1)
-
             # COMPUTE AN EXTRAPOLATION LINE 
             # add first and last point of presumed cars positions and direction vector
             for car in cars:
@@ -396,11 +383,10 @@ with dai.Device(pipeline) as device:
             if len(cars) != 0 and len(persons) != 0:   # if there is a car and a person detected
                 for c in cars:
                     for p in persons:
-                        x1, a1, x2, a2, y1, b1, y2, b2, z1, c1, z2, c2 = c[2][0][0], c[2][2][0], p[2][0][0], p[2][2][0], c[2][0][1], c[2][2][1], p[2][0][1], p[2][2][1], c[2][0][2], c[2][2][2], p[2][0][2], p[2][2][2]
                         ## if the set of coefficients of the direction vectors of two lines, car and person routs, are proportional these lines are parallel to each other
                         #and their direction vectors Cross Product equals 0
-                        if a1/a2 != b1/b2 or b1/b2 != c1/c2 or a1/a2 != c1/c2:    #np.cross(c[2][2], p[2][2]).any() != 0:        #if not np.cross(c[2][2], p[2][2]).all() == 0:  
-                            #x1, a1, x2, a2, y1, b1, y2, b2, z1, c1, z2, c2 = c[2][0][0], c[2][2][0], p[2][0][0], p[2][2][0], c[2][0][1], c[2][2][1], p[2][0][1], p[2][2][1], c[2][0][2], c[2][2][2], p[2][0][2], p[2][2][2]
+                        if not any(np.cross(c[2][2], p[2][2])):          #a1/a2 != b1/b2 or b1/b2 != c1/c2 or a1/a2 != c1/c2
+                            x1, a1, x2, a2, y1, b1, y2, b2, z1, c1, z2, c2 = c[2][0][0], c[2][2][0], p[2][0][0], p[2][2][0], c[2][0][1], c[2][2][1], p[2][0][1], p[2][2][1], c[2][0][2], c[2][2][2], p[2][0][2], p[2][2][2]
                             y2min, y2max = y2 - 100, y2 + 100
                             dy = 1
                             notdone = True
