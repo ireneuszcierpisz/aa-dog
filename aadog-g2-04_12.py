@@ -16,24 +16,24 @@ logging.getLogger().setLevel(logging.INFO)
 # check if the deviations in the series of coordinates, needed to calculate the direction of movement, are below the assumed threshold
 # reject a random error that occurs in collecting of depth coords X,Y,Z. The object is a list of data: [obj_id, detect_time, (xc, yc, X, Y),(....),(....)]
 def check_deviation_of_depth_coords(obj, xc, yc, X, Y, Z):   # this function should be called if len(obj)>6
-    #compute an average deviation of object coords for three last position
+    #compute an average deviation of object coords for three last positions and multiply by 2
     dx = (abs(obj[4][0] - obj[5][0]) + abs(obj[5][0] - obj[6][0]))//2 * 2
-    if dx == 0: dx = 5
+    if dx <= 5: dx = 5
     dy = (abs(obj[4][1] - obj[5][1]) + abs(obj[5][1] - obj[6][1]))//2 * 2
-    if dy == 0: dy = 5
+    if dy <= 5: dy = 5
     dX = (abs(obj[4][2] - obj[5][2]) + abs(obj[5][2] - obj[6][2]))//2 * 2
-    if dX < 10: dX = 50
+    if dX <= 10: dX = 50
     dY = (abs(obj[4][3] - obj[5][3]) + abs(obj[5][3] - obj[6][3]))//2 * 2
-    if dY < 10: dY = 50
+    if dY <= 10: dY = 50
     dZ = (abs(obj[4][4] - obj[5][4]) + abs(obj[5][4] - obj[6][4]))//2 * 2
-    if dZ < 10: dZ = 50
+    if dZ <= 10: dZ = 50
 
     # if xc, yc is within the mean deviation and value of X or Y is large ignore it
-    if abs(obj[-1][0] - xc) <= dx and abs(obj[-1][1] - yc) <= dy and abs(obj[-1][2] - X) > dX*3:
+    if abs(obj[-1][0] - xc) <= dx and abs(obj[-1][1] - yc) <= dy and abs(obj[-1][2] - X) > dX*2:
         X = obj[-1][2]
-    if abs(obj[-1][0] - xc) <= dx and abs(obj[-1][1] - yc) <= dy and abs(obj[-1][3] - Y) > dY*3:
+    if abs(obj[-1][0] - xc) <= dx and abs(obj[-1][1] - yc) <= dy and abs(obj[-1][3] - Y) > dY*2:
         Y = obj[-1][3]
-    if abs(obj[-1][0] - xc) <= dx and abs(obj[-1][1] - yc) <= dy and abs(obj[-1][4] - Z) > dZ*3:
+    if abs(obj[-1][0] - xc) <= dx and abs(obj[-1][1] - yc) <= dy and abs(obj[-1][4] - Z) > dZ*2:
         Z = obj[-1][4]
 
     return X,Y,Z
@@ -236,11 +236,11 @@ with dai.Device(pipeline) as device:
                     p = persons[j]  #predecessor data
                     if len(p) > 6:
                         X, Y, Z = check_deviation_of_depth_coords(p, xc, yc, X, Y, Z)
-                    if (abs(p[-1][0]-xc) < 50) and (abs(p[-1][1]-yc) < 50) and (abs(p[-1][2]-X) < 500) and (abs(p[-1][3]-Y) < 500):
+                    if (abs(p[-1][0]-xc) < 50) and (abs(p[-1][1]-yc) < 50) and (abs(p[-1][2]-X) < 500) and (abs(p[-1][3]-Y) < 500) and (abs(p[-1][4]-Z) < 1000):
                         p_time = time.monotonic()
-                        p[1] = p_time
                         # if it is not a "hole" value (depth measurement error), add new coordinates of an object
                         if X != 0 or Y != 0:
+                            p[1] = p_time
                             p.append((xc, yc, X, Y, Z))    # 
                         if len(p) > 7:  # leave only the last three positions of the person needed to calculate the direction of movement
                             del p[4]
@@ -276,11 +276,11 @@ with dai.Device(pipeline) as device:
                     p = cars[j]  #predecessor data
                     if len(p) > 6:
                         X, Y, Z = check_deviation_of_depth_coords(p, xc, yc, X, Y, Z)
-                    if (abs(p[-1][0]-xc) < 50) and (abs(p[-1][1]-yc) < 50) and (abs(p[-1][2]-X) < 500) and (abs(p[-1][3]-Y) < 500):
+                    if (abs(p[-1][0]-xc) < 50) and (abs(p[-1][1]-yc) < 50) and (abs(p[-1][2]-X) < 500) and (abs(p[-1][3]-Y) < 500) and (abs(p[-1][4]-Z) < 1000):
                         p_time = time.monotonic()
-                        p[1] = p_time
                         # if it is not a "hole" value (depth measurement error), add new coordinates of an object
                         if X != 0 or Y != 0:
+                            p[1] = p_time
                             p.append((xc, yc, X, Y, Z))    # 
                         if len(p) > 7:  # leave only the last three positions of the car needed to calculate the direction of movement
                             del p[4]
@@ -389,21 +389,31 @@ with dai.Device(pipeline) as device:
                             x1, a1, x2, a2, y1, b1, y2, b2, z1, c1, z2, c2 = c[2][0][0], c[2][2][0], p[2][0][0], p[2][2][0], c[2][0][1], c[2][2][1], p[2][0][1], p[2][2][1], c[2][0][2], c[2][2][2], p[2][0][2], p[2][2][2]
                             y2min, y2max = y2 - 100, y2 + 100
                             dy = 1
-                            notdone = True
-                            while notdone:   # while an intersection point is not find
-                                t1 = (a2*(y2-y1) - b2*(x2-x1)) / (a2*b1-a1*b2)
-                                t2 = (a1*(y2-y1) - b1*(x2-x1)) / (a2*b1-a1*b2)
-                                if (t1 * c1) - (t2 * c2) == (z2 - z1):  # if these lines do intersect get intersection point as a np.array
-                                    intersection_point = c[0] + t1 * c[2]
-                                    c[3] = (intersection_point, p[0])  # insert intersection coords and an id of a person the car can collide with
-                                    p[3] = (intersection_point, c[0])  # insert intersection coords and an id of a car the person can collide with
-                                    notdone = False
-                                # if these lines are skew try new line for person with different person's y coord:
-                                elif y2min <= y2 and y2 <= y2max:
-                                    y2 = y2max - dy
-                                    dy += 1
-                                else:
-                                    notdone = False
+                            
+                            # add a condition to avoid ZeroDivisionError
+                            if a2*b1-a1*b2 != 0:
+                                notdone = True
+                                while notdone:   # while an intersection point is not found
+                                    t1 = (a2*(y2-y1) - b2*(x2-x1)) / (a2*b1-a1*b2)
+                                    t2 = (a1*(y2-y1) - b1*(x2-x1)) / (a2*b1-a1*b2)
+                                    if (t1 * c1) - (t2 * c2) == (z2 - z1):  # if these lines do intersect get intersection point as a np.array
+                                        intersection_point = c[0] + t1 * c[2]
+
+                                        # find objects velocity
+                                        # keep time of detection for each of the three positions, calculate distance and speed
+                                        # not done yet----
+
+                                        c[3] = (intersection_point, p[0])  # insert intersection coords and an id of a person the car can collide with
+                                        p[3] = (intersection_point, c[0])  # insert intersection coords and an id of a car the person can collide with
+                                        notdone = False
+                                    # if lines are skew try new line for person with different person's y coord:
+                                    elif y2min <= y2 and y2 <= y2max:
+                                        y2 = y2max - dy
+                                        dy += 1
+                                    else:
+                                        notdone = False
+                            else:
+                                print("Avoid ZeroDivisionError")
 
 #---end tracking-------------------
 
