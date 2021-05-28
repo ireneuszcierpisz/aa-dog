@@ -104,7 +104,7 @@ spatialDetectionNetwork.setConfidenceThreshold(0.5)
 spatialDetectionNetwork.input.setBlocking(False)
 spatialDetectionNetwork.setBoundingBoxScaleFactor(0.5)
 spatialDetectionNetwork.setDepthLowerThreshold(100)
-spatialDetectionNetwork.setDepthUpperThreshold(5000)
+spatialDetectionNetwork.setDepthUpperThreshold(15000)
 
 # Create outputs
 
@@ -215,7 +215,7 @@ with dai.Device(pipeline) as device:
             except:
                 label = detection.label
 
-            # Draw and show data in the frame
+            # Draw data in the frame
             if label == "person" or label == "car":
                 cv2.putText(frame, str(label), (x1 + 10, y1 + 20), cv2.FONT_HERSHEY_TRIPLEX, 0.5, color)
                 cv2.putText(frame, "{:.2f}".format(detection.confidence*100), (x1 + 10, y1 + 35), cv2.FONT_HERSHEY_TRIPLEX, 0.5, color)
@@ -253,19 +253,19 @@ with dai.Device(pipeline) as device:
                         if X != 0 or Y != 0:
                             p_time = time.monotonic()
                             person_id += 1
-                            persons.append([person_id, p_time, ([0,0,0],[0,0,0],[0,0,0]), [0,0,0], (xc, yc, X, Y, Z)])   # append coordinates to the list as a new object position 
+                            persons.append([person_id, p_time, ([0,0,0],[0,0,0],[0,0,0]), [], (xc, yc, X, Y, Z)])   # append coordinates to the list as a new object position 
                             not_found = False
             elif label == "person":     # append the first object
                 p_time = time.monotonic()
                 # append obj id, last possition detection time, extrapolation line parameters(p0,pn,v), intersection point coords and obj id-s, spatial position
-                persons.append([person_id, p_time, ([0,0,0],[0,0,0],[0,0,0]), [0,0,0], (xc, yc, X, Y, Z)])
+                persons.append([person_id, p_time, ([0,0,0],[0,0,0],[0,0,0]), [], (xc, yc, X, Y, Z)])
             
             # check the list of objects to see if there's an object that has come out of a frame for more than 2sec
-            l = [] # list of persons which has come out of a frame and should to be deleted from persons tracking list
-            for c in range(len(persons)):
-                if current_time - persons[c][1] > 2:
-                    l.append(c)
-            for e in l: del persons[e]
+            l = [] # list of indices of persons which has come out of a frame and should to be deleted from persons tracking list
+            for i in range(len(persons)):
+                if current_time - persons[i][1] > 2:
+                    l.append(i)
+            persons = [person for idx,person in enumerate(persons) if idx not in l]
 
             # updates car_id and time and its last position in the frame
             if cars and (label == "car"):  # if list of cars is not empty and it's a car
@@ -293,20 +293,20 @@ with dai.Device(pipeline) as device:
                         if X != 0 or Y != 0:
                             p_time = time.monotonic()
                             car_id += 1
-                            cars.append([car_id, p_time, ([0,0,0],[0,0,0],[0,0,0]), [0,0,0], (xc, yc, X, Y, Z)])   # append coordinates to the list as a new object position 
+                            cars.append([car_id, p_time, ([0,0,0],[0,0,0],[0,0,0]), [], (xc, yc, X, Y, Z)])   # append coordinates to the list as a new object position 
                             not_found = False
             elif label == "car":     # append the first object
                 p_time = time.monotonic()
-                cars.append([car_id, p_time, ([0,0,0],[0,0,0],[0,0,0]), [0,0,0], (xc, yc, X, Y, Z)])
+                cars.append([car_id, p_time, ([0,0,0],[0,0,0],[0,0,0]), [], (xc, yc, X, Y, Z)])
 
             # check the list of objects to see if there's an object that has come out of a frame for more than 2sec
-            l = [] # list of cars which has come out of a frame and should to be deleted from cars tracking list
-            for c in range(len(cars)):
-                if current_time - cars[c][1] > 2:
-                    l.append(c)
-            for e in l: del cars[e]
-                            
+            l = [] # list of indices of cars which has come out of a frame and should be deleted from cars tracking list
+            for i in range(len(cars)):
+                if current_time - cars[i][1] > 2:
+                    l.append(i)
+            cars = [car for idx,car in enumerate(cars) if idx not in l]
 
+                            
             #fill out the checking list(for testing purpose)
             detections_list.append((i, label, xc, yc, X, Y, Z))
 
@@ -341,11 +341,11 @@ with dai.Device(pipeline) as device:
                     # with direction vector for two points on a straight line: v = <l, m, n> = <x2-x1, y2-y1, z2-z1>
                     v = np.array([X2 - X0, Y2 - Y0, Z2 - Z0])
                     cp = cp0 + v  #next car possible position(point on the line)
-                    # Limits calculations for X and Y to 100m==100,000mm in the field of view of the camera i.e. from -50m to + 50m, for Z to 200m
-                    lim = 50000
-                    # compute points of an extrapolation line for a current frame
-                    while (cp[0]>=-lim and cp[0]<=lim and cp[1]>=-lim and cp[1]<=lim and cp[2]<=lim*4 ):
-                        cp = cp + (10 * v) 
+                    ## ??! Limits calculations for X and Y to 100m==100,000mm in the field of view of the camera i.e. from -50m to + 50m, for Z to 200m
+                    #lim = 50  # a value actually to block computing extrapolation points
+                    ## compute points of an extrapolation line for a current frame
+                    #while (cp[0]>=-lim and cp[0]<=lim and cp[1]>=-lim and cp[1]<=lim and cp[2]<=lim*4 ):
+                    #    cp = cp + (10 * v) 
                     car[2] = (cp0, cp, v)   # append direction vector and first and last point on the line of hypothetical car movement
             # calculate presumed persons positions
             for person in persons:
@@ -357,11 +357,11 @@ with dai.Device(pipeline) as device:
                     # with direction vector v = <l, m, n> = <x2-x1, y2-y1, z2-z1>
                     v = np.array([X2 - X0, Y2 - Y0, Z2 - Z0])
                     pp = pp0 + v  #next car possible position(point on the imaginary line) as a sum of two vectors
-                    # Limits of calculations for X and Y to 100m==100,000mm in the field of view of the camera i.e. from -50m to + 50m, for Z to 200m
-                    lim = 50000
-                    # compute points of an extrapolation line for a current frame
-                    while (pp[0]>=-lim and pp[0]<=lim and pp[1]>=-lim and pp[1]<=lim and pp[2]<=lim*4 ):
-                        pp = pp + (10 * v) 
+                    ## ??! Limits of calculations for X and Y to 100m==100,000mm in the field of view of the camera i.e. from -50m to + 50m, for Z to 200m
+                    #lim = 50  # a value actually to block computing extrapolation points
+                    ## compute points of an extrapolation line for a current frame
+                    #while (pp[0]>=-lim and pp[0]<=lim and pp[1]>=-lim and pp[1]<=lim and pp[2]<=lim*4 ):
+                    #    pp = pp + (10 * v) 
                     person[2] = (pp0, pp, v)   # add first and last point on the line of hypothetical car movement, also direction vector to the person
             
             # COMPUTE AN INTERSECTION POINT IN GIVEN FRAME. 
@@ -382,38 +382,70 @@ with dai.Device(pipeline) as device:
             # so: t1*v1[2] - t2*v2[2] = pp0[2] - cp0[2]
             if len(cars) != 0 and len(persons) != 0:   # if there is a car and a person detected
                 for c in cars:
-                    for p in persons:
-                        ## if the set of coefficients of the direction vectors of two lines, car and person routs, are proportional these lines are parallel to each other
-                        #and their direction vectors Cross Product equals 0
-                        if not any(np.cross(c[2][2], p[2][2])):          #a1/a2 != b1/b2 or b1/b2 != c1/c2 or a1/a2 != c1/c2
-                            x1, a1, x2, a2, y1, b1, y2, b2, z1, c1, z2, c2 = c[2][0][0], c[2][2][0], p[2][0][0], p[2][2][0], c[2][0][1], c[2][2][1], p[2][0][1], p[2][2][1], c[2][0][2], c[2][2][2], p[2][0][2], p[2][2][2]
-                            y2min, y2max = y2 - 100, y2 + 100
-                            dy = 1
+                    if len(c) > 6:
+                        print('car id: ', c[0])
+                        for p in persons:
+                            if len(p) > 6:
+                                print('person id: ', p[0])
+                                ## if the set of coefficients of the direction vectors of two lines, car and person routs, are proportional these lines are parallel to each other
+                                #and their direction vectors Cross Product equals 0
+                                if not any(np.cross(c[2][2], p[2][2])):          #a1/a2 != b1/b2 or b1/b2 != c1/c2 or a1/a2 != c1/c2
+                                    # get a point on the car line and its direction vector coefficients 
+                                    x_1, a_1, y_1, b_1, z_1, c_1 = c[2][0][0], c[2][2][0], c[2][0][1], c[2][2][1], c[2][0][2], c[2][2][2]
+                                    print('y_1: {},  z_1: {}'.format(c[2][0][1], c[2][0][2]))
+                                    print('a_1: {}, b_1: {},  c_1: {}'.format(c[2][2][0], c[2][2][1], c[2][2][2]))
+                                    # car line equation: x=a_1*t+x_1, y=b_1*t+y_1, z=c_1*t+z_1
+                                    # a normal vector n to a person's plane it is a np.cross product of two vectors (pp0->pp1, pp0->pp2) 
+                                    # where pp0, pp1, pp2 are three points in the plane, and pp2 differs from pp0 only by the value of the y coordinate increased by 10
+                                    # vector pp0->pp1 == direction vector == p[2][2]
+                                    # vector pp0->pp2 == [p[2][0][0] - p[2][0][0], p[2][0][1] + 10 - p[2][0][1], p[2][0][2] - p[2][0][2]] == [0, 10, 0]
+                                    # Get a normal vector of a plane
+                                    n = np.cross(p[2][2], np.array([0, 10, 0]))
+                                    nx, ny, nz = n[0], n[1], n[2]
+                                    print('nx: {}, ny: {}, nz: {}'.format(nx, ny, nz))
+                                    # equation of the plane nx*(x-x0) + ny*(y-y0) + nz*(z-z0) == 0  => 
+                                    # get a point on the plane
+                                    x0, y0, z0 = p[2][0][0], p[2][0][1], p[2][0][2] #coords of pp0
+                                    d = -(nx*x0 + ny*y0 + nz*z0)
+                                    # nx*x + ny*y + nz*z + d = 0
+                                    # nx*(a_1*t + x_1) + n_y*(b_1*t + y_1) + nz*(c_1*t + z_1) + d == 0
+                                    if (nx*a_1 + ny*b_1 + nz*c_1) != 0:
+                                        t = -(d + nx*x_1 + ny*y_1 + nz*z_1) / (nx*a_1 + ny*b_1 + nz*c_1)
+                                        print('t: ', t)
+                                        xi = a_1*t + x_1
+                                        yi = b_1*t + y_1
+                                        zi = c_1*t + z_1
+                                        #c[3] = [(xi, yi, zi), p[0]]  # insert intersection coords and an id of a person the car can collide with
+                                        p[3].append((xi, yi, zi, c[0]))  # insert intersection coords and an id of a car the person can collide with
+                                    print('END OF THE LOOP OF SEARCHING FOR THE CROSSING POINT OF A CAR WITH A PEDESTRIAN PLANE ')
+
+                            #y2min, y2max = y2 - 100, y2 + 100
+                            #dy = 1
                             
-                            # add a condition to avoid ZeroDivisionError
-                            if a2*b1-a1*b2 != 0:
-                                notdone = True
-                                while notdone:   # while an intersection point is not found
-                                    t1 = (a2*(y2-y1) - b2*(x2-x1)) / (a2*b1-a1*b2)
-                                    t2 = (a1*(y2-y1) - b1*(x2-x1)) / (a2*b1-a1*b2)
-                                    if (t1 * c1) - (t2 * c2) == (z2 - z1):  # if these lines do intersect get intersection point as a np.array
-                                        intersection_point = c[0] + t1 * c[2]
+                            ## add a condition to avoid ZeroDivisionError
+                            #if a2*b1-a1*b2 != 0:
+                            #    notdone = True
+                            #    while notdone:   # while an intersection point is not found
+                            #        t1 = (a2*(y2-y1) - b2*(x2-x1)) / (a2*b1-a1*b2)
+                            #        t2 = (a1*(y2-y1) - b1*(x2-x1)) / (a2*b1-a1*b2)
+                            #        if (t1 * c1) - (t2 * c2) == (z2 - z1):  # if these lines do intersect get intersection point as a np.array
+                            #            intersection_point = c[0] + t1 * c[2]
 
-                                        # find objects velocity
-                                        # keep time of detection for each of the three positions, calculate distance and speed
-                                        # not done yet----
+                            #            # find objects velocity
+                            #            # keep time of detection for each of the three positions, calculate distance and speed
+                            #            # not done yet----
 
-                                        c[3] = (intersection_point, p[0])  # insert intersection coords and an id of a person the car can collide with
-                                        p[3] = (intersection_point, c[0])  # insert intersection coords and an id of a car the person can collide with
-                                        notdone = False
-                                    # if lines are skew try new line for person with different person's y coord:
-                                    elif y2min <= y2 and y2 <= y2max:
-                                        y2 = y2max - dy
-                                        dy += 1
-                                    else:
-                                        notdone = False
-                            else:
-                                print("Avoid ZeroDivisionError")
+                            #            c[3] = (intersection_point, p[0])  # insert intersection coords and an id of a person the car can collide with
+                            #            p[3] = (intersection_point, c[0])  # insert intersection coords and an id of a car the person can collide with
+                            #            notdone = False
+                            #        # if lines are skew try new line for person with different person's y coord:
+                            #        elif y2min <= y2 and y2 <= y2max:
+                            #            y2 = y2max - dy
+                            #            dy += 1
+                            #        else:
+                            #            notdone = False
+                            #else:
+                            #    logging.info("Avoid ZeroDivisionError")
 
 #---end tracking-------------------
 
