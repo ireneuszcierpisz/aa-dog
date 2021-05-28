@@ -171,22 +171,6 @@ with dai.Device(pipeline) as device:
         depthFrameColor = cv2.equalizeHist(depthFrameColor)
         depthFrameColor = cv2.applyColorMap(depthFrameColor, cv2.COLORMAP_HOT)
         detections = inNN.detections
-        # create bb of a roi of depth data
-        #if len(detections) != 0:
-        #    boundingBoxMapping = xoutBoundingBoxDepthMapping.get()
-        #    roiDatas = boundingBoxMapping.getConfigData()
-
-        #    for roiData in roiDatas:
-        #        roi = roiData.roi
-        #        roi = roi.denormalize(depthFrameColor.shape[1], depthFrameColor.shape[0])
-        #        topLeft = roi.topLeft()
-        #        bottomRight = roi.bottomRight()
-        #        xmin = int(topLeft.x)
-        #        ymin = int(topLeft.y)
-        #        xmax = int(bottomRight.x)
-        #        ymax = int(bottomRight.y)
-
-        #        cv2.rectangle(depthFrameColor, (xmin, ymin), (xmax, ymax), color, cv2.FONT_HERSHEY_SCRIPT_SIMPLEX)
 
         # prepare data for tracking:
         count += 1
@@ -309,25 +293,7 @@ with dai.Device(pipeline) as device:
                             
             #fill out the checking list(for testing purpose)
             detections_list.append((i, label, xc, yc, X, Y, Z))
-
             i += 1
-
-            ## SCATTERPLOT
-            ###collecting data for a scatterplot
-            #plotf.append(count)
-            #plotx.append(xc)
-            #ploty.append(yc)
-            #plotX.append(X)
-            #plotY.append(Y)
-            ## create a file with the data
-            #file = open('aadog_stats.txt', 'a')
-            #if X == 0 and Y == 0:
-            #    file.write('>>>>>>>>>>>>>>>>>>>>>'+'\n')
-            #    file.write('f:'+str(count)+', '+'xc: '+str(xc)+' yc: '+str(yc)+', '+'X: '+str(X)+' Y: '+str(Y)+' Z: '+str(Z)+'\n')
-            #    #file.write('--------------------------------------------------'+'\n')
-            #else:
-            #    file.write('f:'+str(count)+', '+'xc: '+str(xc)+' yc: '+str(yc)+', '+'X: '+str(X)+' Y: '+str(Y)+' Z: '+str(Z)+'\n')
-            #file.close()
 
             
             # COMPUTE AN EXTRAPOLATION LINE 
@@ -366,20 +332,6 @@ with dai.Device(pipeline) as device:
             
             # COMPUTE AN INTERSECTION POINT IN GIVEN FRAME. 
             # calculations for each pair of car and person
-            # from given two straight lines (lc for car, lp for person)
-            # for lc: point [x,y,z] = cp0 + t1*v1,   # for lp: [x,y,z] = pp0 + t2*v2
-            # if these two lines actually intersect at a point
-            # from lc obtain:
-            #x = cp0[0] + t1*v1[0]  #y = cp0[1] + t1*v1[1]  #z = cp0[2] + t1*v1[2] 
-            ## from lp obtain:
-            #x = pp0[0] + t2*v2[0]  #y = pp0[1] + t2*v2[1]  #z = pp0[2] + t2*v2[2] 
-            ## equate
-            #cp0[0] + t1*v1[0] = pp0[0] + t2*v2[0]
-            # so: t1*v1[0] - t2*v2[0] = pp0[0] - cp0[0]
-            #cp0[1] + t1*v1[1] = pp0[1] + t2*v2[1]
-            # so: t1*v1[1] - t2*v2[1] = pp0[1] - cp0[1]
-            #cp0[2] + t1*v1[2] = pp0[2] + t2*v2[2]
-            # so: t1*v1[2] - t2*v2[2] = pp0[2] - cp0[2]
             if len(cars) != 0 and len(persons) != 0:   # if there is a car and a person detected
                 for c in cars:
                     if len(c) > 6:
@@ -418,34 +370,6 @@ with dai.Device(pipeline) as device:
                                         #c[3] = [(xi, yi, zi), p[0]]  # insert intersection coords and an id of a person the car can collide with
                                         p[3].append((xi, yi, zi, c[0]))  # insert intersection coords and an id of a car the person can collide with
                                     print('END OF THE LOOP OF SEARCHING FOR THE CROSSING POINT OF A CAR WITH A PEDESTRIAN PLANE ')
-
-                            #y2min, y2max = y2 - 100, y2 + 100
-                            #dy = 1
-                            
-                            ## add a condition to avoid ZeroDivisionError
-                            #if a2*b1-a1*b2 != 0:
-                            #    notdone = True
-                            #    while notdone:   # while an intersection point is not found
-                            #        t1 = (a2*(y2-y1) - b2*(x2-x1)) / (a2*b1-a1*b2)
-                            #        t2 = (a1*(y2-y1) - b1*(x2-x1)) / (a2*b1-a1*b2)
-                            #        if (t1 * c1) - (t2 * c2) == (z2 - z1):  # if these lines do intersect get intersection point as a np.array
-                            #            intersection_point = c[0] + t1 * c[2]
-
-                            #            # find objects velocity
-                            #            # keep time of detection for each of the three positions, calculate distance and speed
-                            #            # not done yet----
-
-                            #            c[3] = (intersection_point, p[0])  # insert intersection coords and an id of a person the car can collide with
-                            #            p[3] = (intersection_point, c[0])  # insert intersection coords and an id of a car the person can collide with
-                            #            notdone = False
-                            #        # if lines are skew try new line for person with different person's y coord:
-                            #        elif y2min <= y2 and y2 <= y2max:
-                            #            y2 = y2max - dy
-                            #            dy += 1
-                            #        else:
-                            #            notdone = False
-                            #else:
-                            #    logging.info("Avoid ZeroDivisionError")
 
 #---end tracking-------------------
 
