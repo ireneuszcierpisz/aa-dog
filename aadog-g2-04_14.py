@@ -23,7 +23,7 @@ logging.getLogger().setLevel(logging.INFO)
 
 #street = get_args().street
 
-not_street = True   # 'False' for real life distances, I mean street. 'True' for experiments with toys.
+not_street = False   # 'False' for real life distances, I mean street. 'True' for experiments with toys.
 
 # check if the deviations in the series of coordinates, needed to calculate the direction of movement, are below the assumed threshold
 # reject a random error that occurs in collecting of depth coords X,Y,Z
